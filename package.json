@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --experimental-https",
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "tunnel": "cloudflared tunnel --url http://localhost:3000",
+    "dev:online": "run-p dev tunnel",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -22,7 +24,8 @@
     "react-dom": "^18",
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.3.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "turbo": "^2.5.5"
   },
   "devDependencies": {
     "@types/node": "^20",

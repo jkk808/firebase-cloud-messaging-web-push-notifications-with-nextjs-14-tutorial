@@ -2,11 +2,20 @@
 
 import { Button } from "@/components/ui/button";
 import useFcmToken from "@/hooks/useFcmToken";
+import { useEffect, useState } from "react";
 
 export default function Home() {
-  const { token, notificationPermissionStatus } = useFcmToken();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  
+  const { token, permission, requestPermissionAndToken, isStandalonePWA } = useFcmToken();
+
+  if (!mounted) return null; // Prevents hydration mismatch
+  
+  // if (!isStandalonePWA) return <p>Add this app to your Home Screen to enable push.</p>;
 
   const handleTestNotification = async () => {
+    console.log("token: ", token);
     const response = await fetch("/send-notification", {
       method: "POST",
       headers: {
@@ -28,13 +37,23 @@ export default function Home() {
     <main className="p-10">
       <h1 className="text-4xl mb-4 font-bold">Firebase Cloud Messaging Demo</h1>
 
-      {notificationPermissionStatus === "granted" ? (
+      <Button onClick={async () => requestPermissionAndToken()}>
+        Enable Notifications
+      </Button>
+      <br />
+      <br />
+
+      {permission === "granted" ? (
         <p>Permission to receive notifications has been granted.</p>
-      ) : notificationPermissionStatus !== null ? (
-        <p>
-          You have not granted permission to receive notifications. Please
-          enable notifications in your browser settings.
-        </p>
+      ) : permission !== null ? (
+        <>      
+          <p>
+            You have not granted permission to receive notifications. Please
+            enable notifications in your browser settings.
+          </p>
+          <br />
+          
+        </>
       ) : null}
 
       <Button
@@ -44,6 +63,11 @@ export default function Home() {
       >
         Send Test Notification
       </Button>
+
+      <div>
+        {token}
+      </div>
     </main>
   );
 }
+

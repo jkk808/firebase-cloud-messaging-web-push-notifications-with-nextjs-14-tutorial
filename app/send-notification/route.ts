@@ -1,3 +1,5 @@
+// sending notifications from backend to devices
+
 import admin from "firebase-admin";
 import { Message } from "firebase-admin/messaging";
 import { NextRequest, NextResponse } from "next/server";
@@ -10,6 +12,7 @@ if (!admin.apps.length) {
   });
 }
 
+//click on notification to a point in the webapp
 export async function POST(request: NextRequest) {
   const { token, title, message, link } = await request.json();
 

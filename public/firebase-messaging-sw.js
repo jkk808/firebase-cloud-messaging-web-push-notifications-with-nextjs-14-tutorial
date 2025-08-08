@@ -5,13 +5,13 @@ importScripts(
 
 // Replace these with your own Firebase config keys...
 const firebaseConfig = {
-  apiKey: null,
-  authDomain: null,
-  projectId: null,
-  storageBucket: null,
-  messagingSenderId: null,
-  appId: null,
-  measurementId: null,
+  apiKey: "AIzaSyDwBI6KYqhXh9NVhZfEdFRc81aRPdCCCFE",
+  authDomain: "fcm-notif-demo-824eb.firebaseapp.com",
+  projectId: "fcm-notif-demo-824eb",
+  storageBucket: "fcm-notif-demo-824eb.firebasestorage.app",
+  messagingSenderId: "999361923562",
+  appId: "1:999361923562:web:1019178ea5ee97d47c4a93",
+  measurementId: "G-CENP41L3EB"
 };
 
 firebase.initializeApp(firebaseConfig);

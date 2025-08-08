@@ -1,0 +1,6 @@
+{
+  "name": "Test Notif App",
+  "short_name": "Test Notif",
+  "start_url": "/",
+  "display": "standalone"
+}
