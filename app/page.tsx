@@ -40,7 +40,7 @@ export default function Home() {
 
       {notificationPermissionStatus === "granted" ? (
         <p>Permission to receive notifications has been granted.</p>
-      ) : notificationPermissionStatus !== null ? (
+      ) : notificationPermissionStatus === null || notificationPermissionStatus === "denied" ? (
         <>      
           <p>
             You have not granted permission to receive notifications. Please
