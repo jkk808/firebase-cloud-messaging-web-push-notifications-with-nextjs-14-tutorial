@@ -34,7 +34,8 @@ messaging.onBackgroundMessage((payload) => {
     icon: "./logo.png",
     data: { url: link },
   };
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  // no need dis because browser has own auto-display
+  // self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 self.addEventListener("notificationclick", function (event) {

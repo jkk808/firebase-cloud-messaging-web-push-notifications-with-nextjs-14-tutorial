@@ -1,85 +1,181 @@
-// useFcmToken.ts
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { onMessage, Unsubscribe, isSupported, getMessaging, getToken } from "firebase/messaging";
-import { messaging as getMessagingInstance, fetchToken } from "@/firebase";
-import { toast } from "sonner"; // Add this import for toast notifications
+import { useEffect, useRef, useState } from "react";
+import { getToken, onMessage, Unsubscribe } from "firebase/messaging";
+import { fetchToken, messaging } from "@/firebase";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-function isStandalonePWA() {
-  // iOS: navigator.standalone; cross-platform: display-mode media query
-  return (typeof window !== "undefined") && (
-    (window.matchMedia?.("(display-mode: standalone)")?.matches ?? false) ||
-    // @ts-ignore - iOS only
-    !!window.navigator.standalone
-  );
-}
+async function getNotificationPermissionAndToken() {
+  // Step 1: Check if Notifications are supported in the browser.
+  if (!("Notification" in window)) {
+    console.info("This browser does not support desktop notification");
+    return null;
+  }
 
-export default function useFcmToken() {
-  const [permission, setPermission] = useState<NotificationPermission | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const retryLoadToken = useRef(0);
-  const isLoading = useRef(false);
+  // Step 2: Check if permission is already granted.
+  if (Notification.permission === "granted") {
+    return await fetchToken();
+  }
 
-  const requestPermissionAndToken = useCallback(async () => {
-    // if (!(await isSupported())) return null;
-    // if (!isStandalonePWA()) return null; // guard: iOS only prompts in Home-Screen apps
-    console.log("Requesting permission and token...");
-
-    // MUST be called from a user gesture (e.g., onClick)
-    const p = await Notification.requestPermission();
-    setPermission(p);
-    if (p !== "granted") return null;
-
-    const t = await fetchToken(); // your wrapper around getToken(messaging, { vapidKey })
-    console.log("Token: ", t);
-    if (!t && retryLoadToken.current < 3) {
-      retryLoadToken.current += 1;
-      return await requestPermissionAndToken();
+  // Step 3: If permission is not denied, request permission from the user.
+  if (Notification.permission !== "denied") {
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      return await fetchToken();
     }
-    if (t) setToken(t);
-    return t;
-  }, []);
+  }
 
-  // DON’T call Notification.requestPermission() here.
-  useEffect(() => {
-    (async () => {
-      if (!(await isSupported())) return;
-      // Optional: if already granted (from a previous session), fetch token silently
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        const t = await fetchToken();
-        if (t) setToken(t);
-        setPermission("granted");
-      } else {
-        setPermission(typeof Notification !== "undefined" ? Notification.permission : null);
-      }
-    })();
-  }, []);
-
-  // Foreground listener once we have a token
-  useEffect(() => {
-    let unsubscribe: Unsubscribe | null = null;
-    (async () => {
-      if (!token) return;
-      const m = await getMessagingInstance();
-      if (!m) return;
-      unsubscribe = onMessage(m, (payload) => {
-        // Show a toast instead of a browser notification
-        toast(payload?.notification?.title ?? "Notification", {
-          description: payload?.notification?.body ?? "",
-          action: {
-            label: "Open",
-            onClick: () => {
-              if (payload?.data?.link) {
-                window.location.href = payload.data.link;
-              }
-            },
-          },
-        });
-      });
-    })();
-    return () => unsubscribe?.();
-  }, [token]);
-
-  return { token, permission, requestPermissionAndToken, isStandalonePWA: isStandalonePWA() };
+  console.log("Notification permission not granted.");
+  return null;
 }
+
+const useFcmToken = () => {
+  const router = useRouter(); // Initialize the router for navigation.
+  const [notificationPermissionStatus, setNotificationPermissionStatus] =
+    useState<NotificationPermission | null>(null); // State to store the notification permission status.
+  const [token, setToken] = useState<string | null>(null); // State to store the FCM token.
+  const retryLoadToken = useRef(0); // Ref to keep track of retry attempts.
+  const isLoading = useRef(false); // Ref to keep track if a token fetch is currently in progress.
+
+  const loadToken = async () => {
+    // Step 4: Prevent multiple fetches if already fetched or in progress.
+    if (isLoading.current) return;
+
+    isLoading.current = true; // Mark loading as in progress.
+    const token = await getNotificationPermissionAndToken(); // Fetch the token.
+
+    // Step 5: Handle the case where permission is denied.
+    if (Notification.permission === "denied") {
+      setNotificationPermissionStatus("denied");
+      console.info(
+        "%cPush Notifications issue - permission denied",
+        "color: green; background: #c7c7c7; padding: 8px; font-size: 20px"
+      );
+      isLoading.current = false;
+      return;
+    }
+
+    // Step 6: Retry fetching the token if necessary. (up to 3 times)
+    // This step is typical initially as the service worker may not be ready/installed yet.
+    if (!token) {
+      if (retryLoadToken.current >= 3) {
+        alert("Unable to load token, refresh the browser");
+        console.info(
+          "%cPush Notifications issue - unable to load token after 3 retries",
+          "color: green; background: #c7c7c7; padding: 8px; font-size: 20px"
+        );
+        isLoading.current = false;
+        return;
+      }
+
+      retryLoadToken.current += 1;
+      console.error("An error occurred while retrieving token. Retrying...");
+      isLoading.current = false;
+      await loadToken();
+      return;
+    }
+
+    // Step 7: Set the fetched token and mark as fetched.
+    setNotificationPermissionStatus(Notification.permission);
+    setToken(token);
+    isLoading.current = false;
+  };
+
+  useEffect(() => {
+    // Step 8: Initialize token loading when the component mounts.
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent);
+    if (
+      "Notification" in window &&
+      (!isMobile || Notification.permission === "granted")
+    ) {
+      loadToken();
+    }
+  }, []);
+
+  useEffect(() => {
+    const setupListener = async () => {
+      if (!token) return; // Exit if no token is available.
+
+      console.log(`onMessage registered with token ${token}`);
+      const m = await messaging();
+      if (!m) return;
+
+      // Step 9: Register a listener for incoming FCM messages.
+      const unsubscribe = onMessage(m, (payload) => {
+        if (Notification.permission !== "granted") return;
+
+        console.log("Foreground push notification received:", payload);
+        const link = payload.fcmOptions?.link || payload.data?.link;
+
+        if (link) {
+          toast.info(
+            `${payload.notification?.title}: ${payload.notification?.body}`,
+            {
+              action: {
+                label: "Visit",
+                onClick: () => {
+                  const link = payload.fcmOptions?.link || payload.data?.link;
+                  if (link) {
+                    router.push(link);
+                  }
+                },
+              },
+            }
+          );
+        } else {
+          toast.info(
+            `${payload.notification?.title}: ${payload.notification?.body}`
+          );
+        }
+
+        // --------------------------------------------
+        // Disable this if you only want toast notifications.
+        const n = new Notification(
+          payload.notification?.title || "New message",
+          {
+            body: payload.notification?.body || "This is a new message",
+            data: link ? { url: link } : undefined,
+          }
+        );
+
+        // Step 10: Handle notification click event to navigate to a link if present.
+        n.onclick = (event) => {
+          event.preventDefault();
+          const link = (event.target as any)?.data?.url;
+          if (link) {
+            router.push(link);
+          } else {
+            console.log("No link found in the notification payload");
+          }
+        };
+        // --------------------------------------------
+      });
+
+      return unsubscribe;
+    };
+
+    let unsubscribe: Unsubscribe | null = null;
+
+    setupListener().then((unsub) => {
+      if (unsub) {
+        unsubscribe = unsub;
+      }
+    });
+
+    // Step 11: Cleanup the listener when the component unmounts.
+    return () => unsubscribe?.();
+  }, [token, router, toast]);
+
+  const manualRequestNotification = async () => {
+    const t = await getNotificationPermissionAndToken();
+    if (t) {
+      setToken(t);
+      setNotificationPermissionStatus(Notification.permission);
+    }
+  };
+
+  return { token, notificationPermissionStatus, manualRequestNotification }; // Return the token and permission status.
+};
+
+export default useFcmToken;

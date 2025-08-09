@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  
-  const { token, permission, requestPermissionAndToken, isStandalonePWA } = useFcmToken();
+
+  const { token, notificationPermissionStatus, manualRequestNotification } = useFcmToken();
 
   if (!mounted) return null; // Prevents hydration mismatch
   
@@ -37,22 +37,19 @@ export default function Home() {
     <main className="p-10">
       <h1 className="text-4xl mb-4 font-bold">Firebase Cloud Messaging Demo</h1>
 
-      <Button onClick={async () => requestPermissionAndToken()}>
-        Enable Notifications
-      </Button>
-      <br />
-      <br />
 
-      {permission === "granted" ? (
+      {notificationPermissionStatus === "granted" ? (
         <p>Permission to receive notifications has been granted.</p>
-      ) : permission !== null ? (
+      ) : notificationPermissionStatus !== null ? (
         <>      
           <p>
             You have not granted permission to receive notifications. Please
             enable notifications in your browser settings.
           </p>
-          <br />
-          
+          <br />        
+          <Button onClick={async () => manualRequestNotification()}>
+            Enable Notifications
+          </Button>      
         </>
       ) : null}
 
